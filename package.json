@@ -1,6 +1,6 @@
 {
   "name": "@wscm/team-time-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Team Time MCP server for task tracking and cooperative agent coordination",
   "type": "module",
   "license": "MIT",

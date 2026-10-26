@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, stat, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, stat, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -275,4 +275,17 @@ test('published executable speaks clean stdio without exposing the credential', 
   const { tools } = await client.listTools();
   assert.equal(tools.length, 16);
   assert.equal(stderr, '');
+});
+
+test('npm-style executable symlink starts the stdio server', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'team-time-mcp-bin-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const bin = join(directory, 'team-time-mcp');
+  await symlink(fileURLToPath(new URL('../src/index.mjs', import.meta.url)), bin);
+  const transport = new StdioClientTransport({ command: process.execPath, args: [bin],
+    env: { TEAM_TIME_API_KEY: key, TEAM_TIME_ORGANIZATION_ID: 'org-1' }, stderr: 'pipe' });
+  const client = new Client({ name: 'bin-symlink-test', version: '1' });
+  t.after(() => client.close());
+  await client.connect(transport);
+  assert.equal((await client.listTools()).tools.length, 16);
 });

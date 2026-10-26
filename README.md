@@ -11,7 +11,7 @@ Set `TEAM_TIME_API_KEY` using your MCP host's secret or environment configuratio
 Run the tagged GitHub package directly:
 
 ```sh
-npx --yes --package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.1.0 team-time-mcp
+npx --yes --package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.1.1 team-time-mcp
 ```
 
 This is a server process: it waits for MCP JSON-RPC input. Add it to your MCP client rather than expecting an interactive terminal UI. The npm package name is reserved in this source but is **not published to the npm registry**.
@@ -25,7 +25,7 @@ For a client that supports `mcpServers` JSON, configure the following and arrang
       "command": "npx",
       "args": [
         "--yes",
-        "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.1.0",
+        "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.1.1",
         "team-time-mcp"
       ]
     }
