@@ -16,6 +16,24 @@ npx --yes --package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.1.1
 
 This is a server process: it waits for MCP JSON-RPC input. Add it to your MCP client rather than expecting an interactive terminal UI. The npm package name is reserved in this source but is **not published to the npm registry**.
 
+### Codex
+
+Merge [`examples/codex.toml`](examples/codex.toml) into your Codex configuration. It forwards the named environment variables without embedding credential values and allows time for the first GitHub package download:
+
+```toml
+# Merge into your Codex config; supply credentials through the local environment.
+[mcp_servers.team-time]
+command = "npx"
+args = ["--yes", "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.1.1", "team-time-mcp"]
+env_vars = ["TEAM_TIME_API_KEY", "TEAM_TIME_ORGANIZATION_ID", "TEAM_TIME_ORIGIN", "TEAM_TIME_STATE_DIR"]
+startup_timeout_sec = 60
+tool_timeout_sec = 60
+```
+
+Supply `TEAM_TIME_API_KEY` and `TEAM_TIME_ORGANIZATION_ID` in Codex's local process environment, reconnect the MCP server, and add the project rules from `examples/AGENTS.md`. This example follows the [official OpenAI MCP configuration documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli). It configures a local stdio process; use a network-enabled runtime that can reach Team Time.
+
+### Other MCP clients
+
 For a client that supports `mcpServers` JSON, configure the following and arrange for its launched process to inherit the two required environment variables:
 
 ```json
