@@ -1,0 +1,22 @@
+{
+  "name": "@wscm/team-time-mcp",
+  "version": "0.1.0",
+  "description": "Team Time MCP server for task tracking and cooperative agent coordination",
+  "type": "module",
+  "license": "MIT",
+  "bin": { "team-time-mcp": "src/index.mjs" },
+  "files": ["src", "examples", "README.md", "LICENSE"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check src/index.mjs && node --check src/api.mjs && node --check src/tools.mjs",
+    "prepublishOnly": "npm run check && npm test"
+  },
+  "repository": { "type": "git", "url": "https://github.com/WorldStoryCm/team-time-mcp.git" },
+  "keywords": ["mcp", "team-time", "tasks", "agents"],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "^4.3.5"
+  }
+}

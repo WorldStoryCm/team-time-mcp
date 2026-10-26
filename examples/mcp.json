@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "team-time": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.1.0",
+        "team-time-mcp"
+      ]
+    }
+  }
+}
