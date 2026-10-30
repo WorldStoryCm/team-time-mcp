@@ -1,7 +1,9 @@
 # Merge into your Codex config; supply credentials through the local environment.
 [mcp_servers.team-time]
 command = "npx"
-args = ["--yes", "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.1.1", "team-time-mcp"]
-env_vars = ["TEAM_TIME_API_KEY", "TEAM_TIME_ORGANIZATION_ID", "TEAM_TIME_ORIGIN", "TEAM_TIME_STATE_DIR"]
+args = ["--yes", "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.2.0", "team-time-mcp"]
+env_vars = ["TEAM_TIME_API_KEY", "TEAM_TIME_ORGANIZATION_ID", "TEAM_TIME_ORIGIN", "TEAM_TIME_STATE_DIR", "TEAM_TIME_COORDINATION_ENABLED"]
+# Optional: set TEAM_TIME_COORDINATION_ENABLED=1 in the launching environment
+# after reviewing the task-linked coordination setup in README.md.
 startup_timeout_sec = 60
 tool_timeout_sec = 60

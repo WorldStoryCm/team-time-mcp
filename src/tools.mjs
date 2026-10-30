@@ -1,6 +1,7 @@
 import * as z from 'zod/v4';
 import { randomUUID } from 'node:crypto';
 import { TeamTimeError } from './api.mjs';
+import { coordinationTools } from './coordination-tools.mjs';
 
 const id = z.string().min(1).max(200);
 const resourceId = id.regex(/^[A-Za-z0-9_-]+$/);
@@ -136,5 +137,5 @@ export function createTools(api) {
   add('retry_command', 'Replay a retained mutation with its original UUID, method, path, and payload. Use after an uncertain response. Does not rebase stale versions. Rechecks credential access.', {
     commandId: z.uuid()
   }, false, args => api.retry(args.commandId));
-  return definitions;
+  return [...definitions, ...coordinationTools(api)];
 }

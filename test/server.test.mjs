@@ -250,7 +250,7 @@ test('MCP handshake, tools/list, bootstrap, mutation, and errors work through th
   await server.connect(serverTransport);
   await client.connect(clientTransport);
   const list = await client.listTools();
-  assert.equal(list.tools.length, 16);
+  assert.equal(list.tools.length, 27);
   assert.equal(list.tools.find(t => t.name === 'team_time_bootstrap').annotations.readOnlyHint, true);
   const boot = await client.callTool({ name: 'team_time_bootstrap', arguments: {} });
   assert.equal(boot.structuredContent.context.organization.id, 'org-1');
@@ -273,7 +273,7 @@ test('published executable speaks clean stdio without exposing the credential', 
   t.after(() => client.close());
   await client.connect(transport);
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 16);
+  assert.equal(tools.length, 27);
   assert.equal(stderr, '');
 });
 
@@ -287,5 +287,5 @@ test('npm-style executable symlink starts the stdio server', async t => {
   const client = new Client({ name: 'bin-symlink-test', version: '1' });
   t.after(() => client.close());
   await client.connect(transport);
-  assert.equal((await client.listTools()).tools.length, 16);
+  assert.equal((await client.listTools()).tools.length, 27);
 });

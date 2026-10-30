@@ -11,7 +11,7 @@ Set `TEAM_TIME_API_KEY` using your MCP host's secret or environment configuratio
 Run the tagged GitHub package directly:
 
 ```sh
-npx --yes --package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.1.1 team-time-mcp
+npx --yes --package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.2.0 team-time-mcp
 ```
 
 This is a server process: it waits for MCP JSON-RPC input. Add it to your MCP client rather than expecting an interactive terminal UI. The npm package name is reserved in this source but is **not published to the npm registry**.
@@ -24,7 +24,7 @@ Merge [`examples/codex.toml`](examples/codex.toml) into your Codex configuration
 # Merge into your Codex config; supply credentials through the local environment.
 [mcp_servers.team-time]
 command = "npx"
-args = ["--yes", "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.1.1", "team-time-mcp"]
+args = ["--yes", "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.2.0", "team-time-mcp"]
 env_vars = ["TEAM_TIME_API_KEY", "TEAM_TIME_ORGANIZATION_ID", "TEAM_TIME_ORIGIN", "TEAM_TIME_STATE_DIR"]
 startup_timeout_sec = 60
 tool_timeout_sec = 60
@@ -43,7 +43,7 @@ For a client that supports `mcpServers` JSON, configure the following and arrang
       "command": "npx",
       "args": [
         "--yes",
-        "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.1.1",
+        "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.2.0",
         "team-time-mcp"
       ]
     }
@@ -88,6 +88,42 @@ The claim is a small JSON footer in the task's description, visible in Team Time
 
 A crashed run leaves its claim intact so another agent cannot silently take over. A human must review the checkpoint and clear or hand off abandoned claims in Team Time. If ownership or workflow changes, stop and reassess.
 
+## Task-linked chats and hooks
+
+Version 0.2 adds optional chat coordination through Team Time tasks. The backend must include the agent-coordination migration/API before these tools are available. Existing discovery/task/claim tools keep working independently.
+
+1. A human administrator enables **Agents → Enable agent coordination** in task details. This opts that project into shared task questions and replies; disabling it stops new sends and inbox delivery while preserving history.
+2. Configure `TEAM_TIME_COORDINATION_ENABLED=1` in the MCP process environment and reconnect the server. One private local bridge is shared by chats using that deployment, credential and state directory.
+3. Call `team_time_agent_hooks_config`. Merge its `config.hooks` handlers into an active Codex hook configuration, preserving existing handlers. Use a stable local checkout for hook commands; regenerate them after moving or upgrading it. Review and trust the exact hooks in Codex. The generated command uses a private local socket and does not contain or require an API credential in the hook environment. SessionStart may precede MCP startup; later prompt/tool boundaries recover delivery.
+4. Use the native `sessionId` emitted by the hook to call `team_time_register_agent_chat`, then `team_time_link_agent_chat` after claiming and starting the task. Publish repository-relative files and a short checkpoint. Linking replaces the declared scope snapshot, so preserve useful existing fields when updating it. Links do not claim ownership. Resuming an ended native chat creates a new run and restores permitted task links from the same installation/session.
+5. Read `team_time_get_task_agents` before asking. Use `team_time_ask_agent` for an active recipient, or `team_time_leave_agent_message` for a queued note. Reply with `team_time_reply_agent_message` using the addressed run ID. Read status with `team_time_get_agent_message` or use bounded `team_time_wait_agent_reply` calls; the answer body is included when available.
+
+The same command handler covers all tasks/messages via SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PermissionRequest, Stop, Interrupt and SessionEnd. It forwards session lifecycle identifiers only; prompt bodies, tool arguments, working-directory paths and native transcripts are not uploaded. Hooks use cached authorized context, inject only bounded batches, and acknowledge the previous injection at the next lifecycle boundary. Delivery acknowledgment never implies an answer. Empty tool boundaries add no context.
+
+The bridge sends batched connectivity updates about every 20 seconds (earlier after lifecycle changes) and polls the inbox every 10 seconds while a chat is active. Connectivity and recent activity expire after 60 seconds on the server. Heartbeat repetition does not invent fresh agent activity. Sessions with no local event for five minutes stop renewing connectivity. Presence is advisory: idle chats are not woken, long model/tool work can look idle, and a connected machine does not guarantee an answer.
+
+Questions have a server deadline of 60 seconds. Stop waiting after no reply; keep the checkpoint and continue only independent authorized work. An offline recipient skips live waiting. Late replies remain labeled late. No timeout releases a task claim or provides permission to overwrite overlapping work. Restarting the bridge preserves installation/run IDs and unacknowledged messages; stale cached context is not injected until a new authorized inbox fetch succeeds.
+
+The private bridge state and Unix socket use owner-only permissions. Socket transport currently targets macOS/Linux. Each installation/credential has its own inbox; sharing an API key still shares its authority. Keep separate named keys for independently managed installations. Use `TEAM_TIME_STATE_DIR` for durable storage if the runtime is ephemeral. Hook failures do not change task ownership; use explicit task/inbox tools when automatic delivery is unavailable.
+
+### Coordination tools
+
+| Tool | Purpose |
+| --- | --- |
+| `team_time_agent_hooks_config` | Shared handler configuration and local setup |
+| `team_time_register_agent_chat` | Register the native chat/run with the bridge |
+| `team_time_get_task_agents` | Linked chats, presence, scope and paginated history |
+| `team_time_link_agent_chat` | Publish this run’s task scope/checkpoint |
+| `team_time_ask_agent` | Ask an active recipient; 60-second deadline |
+| `team_time_leave_agent_message` | Leave a queued task note |
+| `team_time_agent_inbox` | Read this installation/run’s incoming context |
+| `team_time_ack_agent_messages` | Acknowledge consumed context separately from replies |
+| `team_time_reply_agent_message` | Answer as the addressed run |
+| `team_time_get_agent_message` | Read answer/deadline status |
+| `team_time_wait_agent_reply` | Bounded wait that yields for incoming questions |
+
+Codex hook behavior and trust requirements: [official documentation](https://learn.chatgpt.com/docs/hooks). Use the normal Codex trust review; the package does not bypass it.
+
 ## Tools
 
 | Tool | Purpose |
@@ -127,6 +163,7 @@ Credentials are read from environment variables and sent only as the Bearer auth
 | `TEAM_TIME_ORGANIZATION_ID` | Yes | None; pin the expected organization |
 | `TEAM_TIME_ORIGIN` | No | `https://time.wscm.eu` |
 | `TEAM_TIME_STATE_DIR` | No | `~/.local/state/team-time-mcp/<credential-specific namespace>` |
+| `TEAM_TIME_COORDINATION_ENABLED` | No | Set to `1` to maintain the optional shared chat bridge |
 
 Command receipts contain task payloads but **no API credentials or headers**. They use a private directory and files created with `0700`/`0600` permissions. They are eligible for cleanup after seven days; cleanup runs when pending commands are listed. Avoid putting secrets into task descriptions or results. Set `TEAM_TIME_STATE_DIR` to durable local storage if your MCP runtime is ephemeral. Receipts are namespaced by deployment, organization, and credential by default; separate those stores yourself if overriding the directory. HTTP origins are accepted only for loopback development servers; production uses HTTPS.
 

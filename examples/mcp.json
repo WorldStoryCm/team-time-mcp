@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "--yes",
-        "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.1.1",
+        "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.2.0",
         "team-time-mcp"
       ]
     }
