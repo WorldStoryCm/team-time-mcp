@@ -153,7 +153,17 @@ Every new mutation gets a fresh UUID `Idempotency-Key`. Its exact method, path, 
 
 After an uncertain response, use `team_time_pending_commands` and `team_time_retry_command`. Do not repeat the original create or update tool as a new command. On `409 stale_version`, reread the task and workflow, reconsider the change, and issue a new command only if it still makes sense. The server never automatically applies an old edit to newer versions.
 
-Task and workflow versions must be supplied by the caller. The server rereads versions before updates, preserves omitted fields, and uses the API's own compare-and-set check to catch races after those reads. Use `null` to clear an assignee or due date, and `[]` to clear tags.
+Task and workflow versions must be supplied by the caller. The server rereads versions before updates, preserves omitted fields, and uses the API's own compare-and-set check to catch races after those reads. Use `null` to clear an assignee, due date, or priority, and `[]` to clear tags.
+
+### Priority and tags
+
+Both `team_time_create_task` and `team_time_update_task` accept `priority`: `p0` (Urgent), `p1` (High), `p2` (Normal), `p3` (Low), or `null` (No priority). Creation defaults to no priority; omitting it from an update preserves the current value. Priority is independent of tags: existing P0/P1/P2/P3 tags remain ordinary tags and are never converted automatically.
+
+Tags are names in create/update requests and `{id, name}` objects in task responses. A supplied `tags` array replaces the entire set. Read the task and merge existing names before adding or removing individual tags. Omit `tags` for unrelated edits. Existing tag names can be discovered with bootstrap or `team_time_list_tags`; new names are saved with the task (up to 10 tags, 60 characters each).
+
+Example arguments after reading an unclaimed task: `{"taskId":"<task-id>","expectedVersion":3,"priority":"p1","tags":["Backend","Bug"]}`. This sets High priority and replaces tags with Backend and Bug. Include this run's `claimId` for claimed work.
+
+Deploy the Team Time API with migration `0017_task_priority` before using the MCP priority field. Restart the MCP client/server after updating to refresh tool schemas and instructions. Older API deployments reject the new field; do not retry by silently dropping the requested priority.
 
 Credentials are read from environment variables and sent only as the Bearer authorization header. Redirects are rejected. The expected organization must match before resource operations. Allowed operations come from `/context`; the HTTP API enforces current authorization and project targeting on every request. API responses and errors are redacted if they unexpectedly contain the configured credential. Raw network exceptions and request headers are never logged.
 

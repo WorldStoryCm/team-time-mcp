@@ -15,7 +15,7 @@ const key = 'test-credential-do-not-use';
 const operations = ['listProjects', 'listMembers', 'getWorkflow', 'listTags', 'listTasks', 'getTask',
   'createTask', 'updateTask', 'changeTaskStatus', 'completeTask'];
 const initialTask = { id: 'task-1', projectId: 'project-1', title: 'Fix preview', description: 'Keep these requirements.\n',
-  assigneeId: 'user-1', dueOn: '2026-11-01', tags: [{ id: 'tag-1', name: 'Bug' }], version: 1,
+  assigneeId: 'user-1', priority: 'p2', dueOn: '2026-11-01', tags: [{ id: 'tag-1', name: 'Bug' }], version: 1,
   statusCategory: 'not_started', statusId: 'todo', result: '' };
 
 async function fixture(t, options = {}) {
@@ -94,6 +94,49 @@ test('bootstrap confirms organization before sequential discovery, follows pages
   assert.equal(result.members[0].userId, 'user-1');
   assert.equal(result.members[0].id, 'membership-1');
   assert.match(state.requests[2].query, /limit=100/);
+});
+
+test('priority and tags update independently with explicit null and full replacement semantics', async t => {
+  const { run, state } = await fixture(t);
+  const { claim } = await run('claim_task', { taskId: 'task-1', expectedVersion: 1, agentId: 'priority-chat' });
+  const args = () => ({ taskId: 'task-1', expectedVersion: state.task.version, claimId: claim.id });
+  for (const priority of ['p0', 'p1', 'p2', 'p3']) {
+    await run('update_task', { ...args(), priority });
+    assert.equal(state.task.priority, priority);
+    assert.deepEqual(state.task.tags, initialTask.tags);
+    const patch = JSON.parse(state.requests.filter(r => r.method === 'PATCH').at(-1).body);
+    assert.deepEqual(Object.keys(patch).sort(), ['expectedVersion', 'priority']);
+  }
+  await run('update_task', { ...args(), tags: ['Bug', 'Backend'] });
+  assert.equal(state.task.priority, 'p3');
+  assert.deepEqual(state.task.tags, ['Bug', 'Backend']);
+  await run('update_task', { ...args(), result: 'Keep metadata' });
+  assert.equal(state.task.priority, 'p3');
+  assert.deepEqual(state.task.tags, ['Bug', 'Backend']);
+  await run('update_task', { ...args(), priority: null, tags: [] });
+  assert.equal(state.task.priority, null);
+  assert.deepEqual(state.task.tags, []);
+  assert.equal(state.task.result, 'Keep metadata');
+  assert.equal(parseClaim(state.task.description).id, claim.id);
+  const writes = state.writes;
+  for (const priority of ['P0', 'urgent', '', 0, false]) {
+    assert.throws(() => run('update_task', { ...args(), priority }));
+    assert.throws(() => run('create_task', { title: 'Invalid', projectId: 'project-1', priority }));
+  }
+  assert.equal(state.writes, writes);
+});
+
+test('creation forwards all priority levels and leaves omitted priority absent', async t => {
+  const { run, state } = await fixture(t);
+  for (const priority of ['p0', 'p1', 'p2', 'p3', null]) {
+    await run('create_task', { title: 'Priority task', projectId: 'project-1', priority, tags: ['P0'] });
+    const body = JSON.parse(state.requests.filter(r => r.method === 'POST').at(-1).body);
+    assert.equal(body.priority, priority);
+    assert.deepEqual(body.tags, ['P0']);
+  }
+  await run('create_task', { title: 'Default task', projectId: 'project-1' });
+  const body = JSON.parse(state.requests.filter(r => r.method === 'POST').at(-1).body);
+  assert.equal(Object.hasOwn(body, 'priority'), false);
 });
 
 test('wrong organization fails closed before reading resources or mutating', async t => {
@@ -251,12 +294,25 @@ test('MCP handshake, tools/list, bootstrap, mutation, and errors work through th
   await client.connect(clientTransport);
   const list = await client.listTools();
   assert.equal(list.tools.length, 27);
+  assert.match(client.getInstructions(), /Priority is p0/);
+  assert.match(client.getInstructions(), /replace the entire set/);
+  for (const name of ['team_time_create_task', 'team_time_update_task']) {
+    const tool = list.tools.find(tool => tool.name === name);
+    assert.ok(tool.inputSchema.properties.priority);
+    assert.ok(!tool.inputSchema.required.includes('priority'));
+  }
   assert.equal(list.tools.find(t => t.name === 'team_time_bootstrap').annotations.readOnlyHint, true);
   const boot = await client.callTool({ name: 'team_time_bootstrap', arguments: {} });
   assert.equal(boot.structuredContent.context.organization.id, 'org-1');
   const claim = await client.callTool({ name: 'team_time_claim_task', arguments: { taskId: 'task-1', expectedVersion: 1, agentId: 'protocol-test' } });
   assert.ok(claim.structuredContent.claim.id);
-  const busy = await client.callTool({ name: 'team_time_complete_task', arguments: { taskId: 'task-1', expectedVersion: 2 } });
+  const priority = await client.callTool({ name: 'team_time_update_task', arguments: { taskId: 'task-1', expectedVersion: 2, claimId: claim.structuredContent.claim.id, priority: 'p1', tags: ['Bug', 'Backend'] } });
+  assert.equal(priority.isError, undefined);
+  assert.equal(priority.structuredContent.data.priority, 'p1');
+  assert.deepEqual(priority.structuredContent.data.tags, ['Bug', 'Backend']);
+  const invalidPriority = await client.callTool({ name: 'team_time_update_task', arguments: { taskId: 'task-1', expectedVersion: 3, priority: 'urgent' } });
+  assert.equal(invalidPriority.isError, true);
+  const busy = await client.callTool({ name: 'team_time_complete_task', arguments: { taskId: 'task-1', expectedVersion: 3 } });
   assert.equal(busy.isError, true);
   assert.equal(busy.structuredContent.error.code, 'task_claimed');
   const invalid = await client.callTool({ name: 'team_time_create_task', arguments: { title: 'Work', projectId: 'project-1', dueOn: '2026-02-31' } });

@@ -8,6 +8,7 @@ const resourceId = id.regex(/^[A-Za-z0-9_-]+$/);
 const version = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const text = z.string().max(5000);
 const date = z.iso.date().nullable();
+const priority = z.enum(['p0', 'p1', 'p2', 'p3']).nullable();
 const tags = z.array(z.string().min(1).max(60)).max(10);
 const paging = { limit: z.number().int().min(1).max(100).optional(), cursor: z.string().max(4000).optional() };
 const ownedTask = { taskId: resourceId, expectedVersion: version, claimId: z.uuid().optional() };
@@ -73,9 +74,9 @@ export function createTools(api) {
   }, true, args => api.read('listTasks', '/tasks', args));
   add('get_task', 'Read the task and version. Inspect description for a team-time-mcp claim before starting work.', { taskId: resourceId }, true,
     args => api.read('getTask', `/tasks/${args.taskId}`));
-  add('create_task', 'Create unfinished work after checking for overlapping tasks. Resolve IDs with bootstrap. Tags are names; assigneeId is a userId. Creation cannot atomically deduplicate competing agents.', {
+  add('create_task', 'Create unfinished work after checking for overlapping tasks. Resolve IDs with bootstrap. Priority: p0 Urgent, p1 High, p2 Normal, p3 Low, or null (default). Tags are names, independent of priority; assigneeId is a userId. Creation cannot atomically deduplicate competing agents.', {
     title: z.string().min(1).max(200), projectId: id, description: text.optional(),
-    assigneeId: id.nullable().optional(), dueOn: date.optional(), tags: tags.optional(), statusId: id.optional()
+    assigneeId: id.nullable().optional(), dueOn: date.optional(), priority: priority.optional(), tags: tags.optional(), statusId: id.optional()
   }, false, async args => {
     if (args.description?.includes(prefix)) throw new TeamTimeError('reserved_metadata', 'Use claim_task to create claim metadata.');
     return api.mutate('createTask', 'POST', '/tasks', args);
@@ -91,9 +92,9 @@ export function createTools(api) {
     const response = await api.mutate('updateTask', 'PATCH', `/tasks/${args.taskId}`, { expectedVersion: args.expectedVersion, description });
     return { ...response, claim, next: 'Keep claim.id. Use set_status with the new task version and claimId to move into progress before starting work.' };
   });
-  add('update_task', 'Update only supplied fields after reading the task. Omitted fields stay unchanged; null clears assignee/due date; [] clears tags. Supply claimId for claimed work. Put progress/checkpoints in result, preserving previous checkpoints when useful.', {
+  add('update_task', 'Update only supplied fields after reading the task. Omitted fields stay unchanged; null clears assignee/due date/priority. Priority: p0 Urgent, p1 High, p2 Normal, p3 Low. Supplied tags replace ALL tags by name; merge existing names to add/remove individual tags; [] clears tags. Priority and tags are independent. Supply claimId for claimed work. Put progress/checkpoints in result, preserving previous checkpoints when useful.', {
     ...ownedTask, title: z.string().min(1).max(200).optional(), projectId: id.optional(),
-    assigneeId: id.nullable().optional(), dueOn: date.optional(), description: text.optional(), result: text.optional(), tags: tags.optional()
+    assigneeId: id.nullable().optional(), dueOn: date.optional(), priority: priority.optional(), description: text.optional(), result: text.optional(), tags: tags.optional()
   }, false, async args => {
     const { claim } = await current(args);
     const { taskId, claimId, ...body } = args;

@@ -12,6 +12,12 @@ After verification, complete the task with a concise result, test evidence, and 
 
 Claims coordinate cooperating agents on a single task. They cannot guarantee exclusion for duplicate tasks or overlapping files. Ask for human coordination when scope overlaps or ownership is uncertain. Do not start or alter human timers implicitly. If the MCP is unavailable, report that shared coordination could not be checked and get direction before starting potentially overlapping work.
 
+## Priority and tags
+
+Use `priority` on `team_time_create_task` and `team_time_update_task`: `p0` (Urgent), `p1` (High), `p2` (Normal), `p3` (Low), or `null` (No priority). New tasks default to no priority; omitted priority on updates stays unchanged. Set priority when requested or explicitly established in the task requirements. Priority is separate from tags; do not convert or delete existing P0/P1/P2/P3 tags automatically.
+
+Read the task before editing tags. Creation and updates accept tag names, while task responses return `{id, name}` objects. A supplied `tags` array replaces the whole set: merge existing names to add/remove individual tags, use `[]` to clear all tags, and omit tags to preserve them. Reuse discovered names when appropriate; new names are created with the task. Use the observed version and this run's claim ID for these updates, as for all other task writes.
+
 ## Optional task chat coordination
 
 When a human has enabled project coordination and configured the shared hooks, register this native chat with `team_time_register_agent_chat`, using the session ID supplied by the host/hook. Retain its run ID and installation ID; never guess another chat’s identity. After claiming and starting work, link this run to the task and declare the repository, branch, relative files and checkpoint. Keep the scope current without discarding useful existing fields.
