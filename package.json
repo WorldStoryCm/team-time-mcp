@@ -1,7 +1,7 @@
 {
   "name": "@wscm/team-time-mcp",
-  "version": "0.2.0",
-  "description": "Team Time MCP server for task tracking and cooperative agent coordination",
+  "version": "0.3.0",
+  "description": "Embedded or cloud task tracking and shared project knowledge for agents",
   "type": "module",
   "license": "MIT",
   "bin": {
@@ -14,12 +14,12 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "scripts": {
     "start": "node src/index.mjs",
     "test": "node --test test/*.test.mjs",
-    "check": "node --check src/index.mjs && node --check src/api.mjs && node --check src/tools.mjs && node --check src/coordination.mjs && node --check src/coordination-tools.mjs",
+    "check": "node --check src/index.mjs && node --check src/api.mjs && node --check src/tools.mjs && node --check src/coordination.mjs && node --check src/coordination-tools.mjs && node --check src/local.mjs && node --check src/knowledge-tools.mjs && node --check src/viewer.mjs",
     "prepublishOnly": "npm run check && npm test"
   },
   "repository": {
