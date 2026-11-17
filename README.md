@@ -1,20 +1,35 @@
 # Team Time MCP
 
-An installable [Model Context Protocol](https://modelcontextprotocol.io/) server for the [Team Time HTTP API](https://time.wscm.eu/api/v1/ai.md). Use it from a coding agent to discover projects, check existing work, claim a task, record progress, and complete verified work.
-
-Requires Node.js 22 or newer and a Team Time API key. Transport: local stdio. No build step or hosted MCP endpoint is required.
+Track agent tasks and project knowledge in an embedded local database or the shared Team Time cloud. The same stdio tools handle task claims, evidence-backed proposals, conflict checks, review decisions and revision history.
 
 ## Install
 
-Set `TEAM_TIME_API_KEY` using your MCP host's secret or environment configuration. Set `TEAM_TIME_ORGANIZATION_ID` to the expected organization ID. Never place a key in a URL, command argument, shared prompt, or committed config. A project-scoped key is supported; `/context` determines its allowed operations.
-
-Run the tagged GitHub package directly:
+Use Node.js 22.13 or later. Install the GitHub package in your MCP client, or clone the repository and run `npm ci --ignore-scripts` once. An installed checkout can run offline with `node /path/to/team-time-mcp/src/index.mjs`.
 
 ```sh
-npx --yes --package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.2.0 team-time-mcp
+npx --yes --package=git+https://github.com/WorldStoryCm/team-time-mcp.git#main team-time-mcp
 ```
 
-This is a server process: it waits for MCP JSON-RPC input. Add it to your MCP client rather than expecting an interactive terminal UI. The npm package name is reserved in this source but is **not published to the npm registry**.
+For reproducible installations, replace `main` with a reviewed commit. Start the MCP host in your project or set `TEAM_TIME_PROJECT_DIR` to its absolute path.
+
+| Configuration | Where work is saved |
+| --- | --- |
+| No cloud settings | A private SQLite file on this machine. The package opens it on first use. |
+| Cloud API key and expected organization ID | The shared project through Team Time’s HTTP API. `TEAM_TIME_ORIGIN` selects a deployment. |
+| Partial credentials, revoked access or a cloud outage | The client reports the error. Uncertain writes retain their cloud command ID for replay. |
+
+`team_time_bootstrap` reports the selected backend in `context.storage`. Use `TEAM_TIME_MODE=local` or `cloud` to pin a profile. Switching profiles affects subsequent operations. To share local work between agents on one machine, use the same Git root or explicit `TEAM_TIME_LOCAL_DIR`. The default is `~/.local/share/team-time-mcp/<project-path-hash>/time.sqlite`. Choose an explicit directory when using multiple checkouts for one project. The default project name comes from the repository directory. Keep the SQLite file and its journal files together when the database is open.
+
+Open the project knowledge interface using `team-time-mcp view` (or `node /path/to/team-time-mcp/src/index.mjs view`) with the same environment as your MCP host. Local mode prints a private loopback link valid while the command is running. Cloud mode prints the project’s web URL or the project directory for an organization-wide key.
+
+## Knowledge workflow
+
+- At task start run `team_time_knowledge_search` with the returned project ID. Open a relevant record with `team_time_knowledge_note` to inspect its current wording, sources and earlier revisions.
+- At task completion use `team_time_knowledge_propose` for a durable finding. Provide title, category, content and evidence. For an update include `target: {noteId, revision}`. Cite a conflicting or duplicate note through `links` with its ID, revision, relation and reason.
+- A reviewing agent lists proposals with `view: "review"`, then calls `team_time_knowledge_check`. It receives the proposal, cited notes and candidates with matching titles or overlapping words. Compare their evidence, search alternate wording, and use `team_time_knowledge_review` to approve, reject or merge. Supply a reason. For merge, include the destination note and revision and the full `mergedContent`. A new revision preserves the original proposal and both source trails. Use `team_time_knowledge_proposal` to inspect a prior decision.
+- If evidence is inconclusive, leave the proposal pending. A running reviewing agent provides the semantic judgment. Team Time serializes the decision, rejects stale writes and retains the audit trail.
+
+For hosted access, put the credential in `TEAM_TIME_API_KEY` and pin `TEAM_TIME_ORGANIZATION_ID` in the MCP host environment. Administrators grant `knowledge:read`, `knowledge:write` and `knowledge:review` through Settings → API keys. Existing keys keep their scopes. Check bootstrap’s operation list on older deployments. The free edition runs these tools locally without a subscription or credential.
 
 ### Codex
 
@@ -24,17 +39,17 @@ Merge [`examples/codex.toml`](examples/codex.toml) into your Codex configuration
 # Merge into your Codex config; supply credentials through the local environment.
 [mcp_servers.team-time]
 command = "npx"
-args = ["--yes", "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.2.0", "team-time-mcp"]
-env_vars = ["TEAM_TIME_API_KEY", "TEAM_TIME_ORGANIZATION_ID", "TEAM_TIME_ORIGIN", "TEAM_TIME_STATE_DIR"]
+args = ["--yes", "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#main", "team-time-mcp"]
+env_vars = ["TEAM_TIME_API_KEY", "TEAM_TIME_ORGANIZATION_ID", "TEAM_TIME_ORIGIN", "TEAM_TIME_STATE_DIR", "TEAM_TIME_MODE", "TEAM_TIME_LOCAL_DIR", "TEAM_TIME_PROJECT_DIR"]
 startup_timeout_sec = 60
 tool_timeout_sec = 60
 ```
 
-Supply `TEAM_TIME_API_KEY` and `TEAM_TIME_ORGANIZATION_ID` in Codex's local process environment, reconnect the MCP server, and add the project rules from `examples/AGENTS.md`. This example follows the [official OpenAI MCP configuration documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli). It configures a local stdio process; use a network-enabled runtime that can reach Team Time.
+For cloud mode, supply `TEAM_TIME_API_KEY` and `TEAM_TIME_ORGANIZATION_ID` in Codex's local process environment, reconnect the MCP server, and add the project rules from `examples/AGENTS.md`. This example follows the [official OpenAI MCP configuration documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli). It configures a local stdio process; use a network-enabled runtime that can reach Team Time.
 
 ### Other MCP clients
 
-For a client that supports `mcpServers` JSON, configure the following and arrange for its launched process to inherit the two required environment variables:
+For a client that supports `mcpServers` JSON, configure the following and forward the two credential variables when using cloud mode:
 
 ```json
 {
@@ -43,7 +58,7 @@ For a client that supports `mcpServers` JSON, configure the following and arrang
       "command": "npx",
       "args": [
         "--yes",
-        "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#v0.2.0",
+        "--package=git+https://github.com/WorldStoryCm/team-time-mcp.git#main",
         "team-time-mcp"
       ]
     }
@@ -145,7 +160,7 @@ Codex hook behavior and trust requirements: [official documentation](https://lea
 | `team_time_pending_commands` | Recover command IDs after uncertain responses |
 | `team_time_retry_command` | Replay the exact retained mutation |
 
-This version focuses on task coordination. It does not expose timers, time corrections, reports, invitations, team administration, destructive deletes, or workflow administration. Completing a task still follows Team Time's domain rules: it may stop the key creator's matching timer, and another member's running timer can block completion. No timer is started implicitly.
+This package exposes task coordination and project knowledge. It does not expose timers, time corrections, reports, invitations, team administration, destructive deletes, or workflow administration. Completing a task still follows Team Time's domain rules: it may stop the key creator's matching timer, and another member's running timer can block completion. No timer is started implicitly.
 
 ## Retries, versions, and credentials
 
@@ -169,9 +184,10 @@ Credentials are read from environment variables and sent only as the Bearer auth
 
 | Variable | Required | Default |
 | --- | --- | --- |
-| `TEAM_TIME_API_KEY` | Yes | None; use secret configuration |
-| `TEAM_TIME_ORGANIZATION_ID` | Yes | None; pin the expected organization |
+| `TEAM_TIME_API_KEY` | Cloud | None; use secret configuration |
+| `TEAM_TIME_ORGANIZATION_ID` | Cloud | None; pin the expected organization |
 | `TEAM_TIME_ORIGIN` | No | `https://time.wscm.eu` |
+| `TEAM_TIME_AGENT_NAME` | Local, optional | Label attributed to this local agent’s knowledge. Defaults to a unique run ID. |
 | `TEAM_TIME_STATE_DIR` | No | `~/.local/state/team-time-mcp/<credential-specific namespace>` |
 | `TEAM_TIME_COORDINATION_ENABLED` | No | Set to `1` to maintain the optional shared chat bridge |
 

@@ -1,0 +1,48 @@
+:root {
+  color-scheme: light dark;
+  font:
+    15px/1.55 system-ui,
+    sans-serif;
+  --foreground: #17232e;
+  --border: #cdd4da;
+  --muted: #edf1f4;
+  --selected: #dfe9f5;
+  --accent-text: #245792;
+  --muted-foreground: #5b6873;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #fafbfc;
+  color: var(--foreground);
+}
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: clamp(16px, 4vw, 56px);
+}
+header p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
+}
+h1 {
+  font-size: 1.9rem;
+  letter-spacing: -0.04em;
+  margin: 0 0 1rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground: #e6eaf0;
+    --border: #39414a;
+    --muted: #252d36;
+    --selected: #253449;
+    --accent-text: #a1c3f5;
+    --muted-foreground: #a1aab6;
+  }
+  body {
+    background: #171a1f;
+  }
+}
