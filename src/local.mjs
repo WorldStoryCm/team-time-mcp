@@ -61,20 +61,27 @@ export class LocalClient extends CommandClient {
     this.db.function('lower', { deterministic: true }, (value) =>
       value == null ? null : String(value).toLowerCase()
     );
-    this.db.exec(
-      'PRAGMA busy_timeout=8000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;'
-    );
-    this.db.exec(
-      readFileSync(new URL('./knowledge/local.sql', import.meta.url), 'utf8')
-    );
-    this.db
-      .prepare(
-        'INSERT OR IGNORE INTO local_project (slot,id,name) VALUES (1,?,?)'
-      )
-      .run(randomUUID(), basename(root) || 'Local project');
-    this.project = this.db
-      .prepare('SELECT id,name FROM local_project WHERE slot=1')
-      .get();
+    this.db.exec('PRAGMA busy_timeout=8000; PRAGMA foreign_keys=ON');
+    // Acquire the writer lock before schema discovery when agents start simultaneously.
+    // The default rollback journal also permits independent MCP processes to share this file.
+    try {
+      this.db.exec('BEGIN IMMEDIATE');
+      this.db.exec(
+        readFileSync(new URL('./knowledge/local.sql', import.meta.url), 'utf8')
+      );
+      this.db
+        .prepare(
+          'INSERT OR IGNORE INTO local_project (slot,id,name) VALUES (1,?,?)'
+        )
+        .run(randomUUID(), basename(root) || 'Local project');
+      this.project = this.db
+        .prepare('SELECT id,name FROM local_project WHERE slot=1')
+        .get();
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.close();
+      throw error;
+    }
     this.organizationId = 'local-' + this.project.id;
     this.actor =
       env.TEAM_TIME_AGENT_NAME?.trim().slice(0, 120) || 'agent/' + randomUUID();

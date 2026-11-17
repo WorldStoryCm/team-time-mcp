@@ -42,6 +42,7 @@ test('independent stdio agents share embedded task claims and reviewed revisions
   });
   async function connect() {
     const client = new Client({ name: 'local-test', version: '1' });
+    clients.add(client);
     await client.connect(
       new StdioClientTransport({
         command: process.execPath,
@@ -50,7 +51,6 @@ test('independent stdio agents share embedded task claims and reviewed revisions
         stderr: 'pipe'
       })
     );
-    clients.add(client);
     return async (name, args = {}) => {
       const result = await client.callTool({
         name: 'team_time_' + name,
@@ -64,7 +64,7 @@ test('independent stdio agents share embedded task claims and reviewed revisions
       return result.structuredContent;
     };
   }
-  const [a, b] = await Promise.all([connect(), connect()]);
+  const [a, b] = await Promise.all(Array.from({ length: 4 }, () => connect()));
   const boot = await a('bootstrap'),
     projectId = boot.projects[0].id;
   const task = (
